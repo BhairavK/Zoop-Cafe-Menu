@@ -2,11 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-
-    <!-- Important for mobile devices -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Cafe Menu</title>
+    <title>Café Menu</title>
 
     <style>
         * {
@@ -17,22 +15,140 @@
         body {
             margin: 0;
             padding: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
+            background: #f3f3f3;
         }
 
-        iframe {
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #loading {
+            padding: 30px;
+            font-family: Arial, sans-serif;
+            font-size: 16px;
+        }
+
+        #menu {
             width: 100%;
-            height: 100vh;
-            border: none;
+            max-width: 1000px;
+        }
+
+        .page {
+            width: 100%;
+            display: block;
+            margin: 0 auto 8px;
+            background: white;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: auto;
         }
     </style>
 </head>
 
 <body>
 
-    <iframe src="menu.pdf" title="Cafe Menu"></iframe>
+    <div id="loading">
+        Loading menu...
+    </div>
+
+    <main id="menu"></main>
+
+    <script type="module">
+
+        import * as pdfjsLib from
+            "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs";
+
+        // PDF.js worker
+        pdfjsLib.GlobalWorkerOptions.workerSrc =
+            "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs";
+
+        const pdfUrl = "./menu.pdf";
+
+        const menuContainer = document.getElementById("menu");
+        const loading = document.getElementById("loading");
+
+        async function renderMenu() {
+
+            try {
+
+                const pdf = await pdfjsLib.getDocument(pdfUrl).promise;
+
+                loading.textContent = `Loading ${pdf.numPages} pages...`;
+
+                for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+
+                    const page = await pdf.getPage(pageNumber);
+
+                    const containerWidth = Math.min(
+                        menuContainer.clientWidth,
+                        1000
+                    );
+
+                    const initialViewport = page.getViewport({
+                        scale: 1
+                    });
+
+                    const scale = containerWidth / initialViewport.width;
+
+                    const viewport = page.getViewport({
+                        scale: scale
+                    });
+
+                    const canvas = document.createElement("canvas");
+                    const context = canvas.getContext("2d");
+
+                    // Increase rendering resolution on high-DPI phones
+                    const devicePixelRatio = Math.min(
+                        window.devicePixelRatio || 1,
+                        2
+                    );
+
+                    canvas.width = Math.floor(
+                        viewport.width * devicePixelRatio
+                    );
+
+                    canvas.height = Math.floor(
+                        viewport.height * devicePixelRatio
+                    );
+
+                    canvas.style.width = `${viewport.width}px`;
+                    canvas.style.height = `${viewport.height}px`;
+
+                    canvas.className = "page";
+
+                    menuContainer.appendChild(canvas);
+
+                    const renderContext = {
+                        canvasContext: context,
+                        viewport: viewport,
+                        transform: devicePixelRatio !== 1
+                            ? [devicePixelRatio, 0, 0, devicePixelRatio, 0, 0]
+                            : null
+                    };
+
+                    await page.render(renderContext).promise;
+                }
+
+                loading.remove();
+
+            } catch (error) {
+
+                console.error(error);
+
+                loading.textContent =
+                    "Unable to load the menu. Please try again.";
+
+            }
+        }
+
+        renderMenu();
+
+    </script>
 
 </body>
 </html>
